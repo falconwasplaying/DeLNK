@@ -50,11 +50,9 @@ cd /c/users/username/documents/dearrow
 Now run:
 
 ```bash
-windres resources-x64.rc -O coff -o rsc-x64.o
-```
-
-```bash
-g++ main.cpp rsc-x64.o -o dearrow-x64.exe -mwindows -lgdi32 -ladvapi32 -lshell32 -nostartfiles -e WinMainCRTStartup -Os -s -fno-exceptions -fno-rtti -ffunction-sections -fdata-sections "-Wl,--gc-sections"
+mkdir -p bin
+windres -i res/resources-x64.rc -I res -O coff -o bin/rsc-x64.o
+g++ src/main.cpp bin/rsc-x64.o -o bin/dearrow-x64.exe -mwindows -lgdi32 -ladvapi32 -lshell32 -nostartfiles -e WinMainCRTStartup -Os -s -fno-exceptions -fno-rtti -ffunction-sections -fdata-sections "-Wl,--gc-sections"
 ```
 
 ### 32-bit gui build
@@ -70,11 +68,9 @@ cd /c/users/username/documents/dearrow
 Now run:
 
 ```bash
-windres resources-x32.rc -O coff -o rsc-x32.o
-```
-
-```bash
-g++ main.cpp rsc-x32.o -o dearrow-x32.exe -mwindows -lgdi32 -ladvapi32 -lshell32 -nostartfiles -e _WinMainCRTStartup@0 -Os -s -fno-exceptions -fno-rtti -ffunction-sections -fdata-sections -static-libgcc -Wl,--gc-sections
+mkdir -p bin
+windres -i res/resources-x32.rc -I res -O coff -o bin/rsc-x32.o
+g++ src/main.cpp bin/rsc-x32.o -o bin/dearrow-x32.exe -mwindows -lgdi32 -ladvapi32 -lshell32 -nostartfiles -e _WinMainCRTStartup@0 -Os -s -fno-exceptions -fno-rtti -ffunction-sections -fdata-sections -static-libgcc -Wl,--gc-sections
 ```
 
 > [!Tip]
@@ -96,11 +92,9 @@ cd /c/users/username/documents/dearrow
 Now run:
 
 ```bash
-windres resources-cli-x64.rc -O coff -o rsc-cli-x64.o
-```
-
-```bash
-g++ cli.cpp rsc-cli-x64.o -o dearrow-cli-x64.exe -mconsole -ladvapi32 -lshell32 -nostartfiles -e mainCRTStartup -Os -s -fno-exceptions -fno-rtti -ffunction-sections -fdata-sections -Wl,--gc-sections
+mkdir -p bin
+windres -i res/resources-cli-x64.rc -I res -O coff -o bin/rsc-cli-x64.o
+g++ src/cli.cpp bin/rsc-cli-x64.o -o bin/dearrow-cli-x64.exe -mconsole -ladvapi32 -lshell32 -nostartfiles -e mainCRTStartup -Os -s -fno-exceptions -fno-rtti -ffunction-sections -fdata-sections -Wl,--gc-sections
 ```
 
 ### 32-bit cli build
@@ -117,11 +111,9 @@ cd /c/users/username/documents/dearrow
 Now run:
 
 ```bash
-windres resources-cli-x32.rc -O coff -o rsc-cli-x32.o
-```
-
-```bash
-g++ cli.cpp rsc-cli-x32.o -o dearrow-cli-x32.exe -mconsole -ladvapi32 -lshell32 -nostartfiles -e _mainCRTStartup@0 -Os -s -fno-exceptions -fno-rtti -ffunction-sections -fdata-sections -static-libgcc -Wl,--gc-sections
+mkdir -p bin
+windres -i res/resources-cli-x32.rc -I res -O coff -o bin/rsc-cli-x32.o
+g++ src/cli.cpp bin/rsc-cli-x32.o -o bin/dearrow-cli-x32.exe -mconsole -ladvapi32 -lshell32 -nostartfiles -e _mainCRTStartup@0 -Os -s -fno-exceptions -fno-rtti -ffunction-sections -fdata-sections -static-libgcc -Wl,--gc-sections
 ```
 
 ### If not using MSYS2
@@ -130,11 +122,13 @@ If you installed MinGW-w64 another way (e.g. WinLibs) and have both
 architectures available, use the prefixed binaries explicitly instead:
 
 ```bash
+mkdir -p bin
+
 # 64-bit
-x86_64-w64-mingw32-windres resources.rc -O coff -o resources.o
-x86_64-w64-mingw32-g++ main.cpp resources.o -o dearrow-x64.exe -mwindows -lgdi32 -ladvapi32 -lshell32 -nostartfiles -e WinMainCRTStartup -Os -s -fno-exceptions -fno-rtti -ffunction-sections -fdata-sections "-Wl,--gc-sections"
+x86_64-w64-mingw32-windres -i res/resources-x64.rc -I res -O coff -o bin/rsc-x64.o
+x86_64-w64-mingw32-g++ src/main.cpp bin/rsc-x64.o -o bin/dearrow-x64.exe -mwindows -lgdi32 -ladvapi32 -lshell32 -nostartfiles -e WinMainCRTStartup -Os -s -fno-exceptions -fno-rtti -ffunction-sections -fdata-sections "-Wl,--gc-sections"
 
 # 32-bit
-i686-w64-mingw32-windres resources.rc -O coff -o resources.o
-i686-w64-mingw32-g++ main.cpp resources.o -o dearrow-x32.exe -mwindows -lgdi32 -ladvapi32 -lshell32 -nostartfiles -e WinMainCRTStartup -Os -s -fno-exceptions -fno-rtti -ffunction-sections -fdata-sections "-Wl,--gc-sections"
+i686-w64-mingw32-windres -i res/resources-x32.rc -I res -O coff -o bin/rsc-x32.o
+i686-w64-mingw32-g++ src/main.cpp bin/rsc-x32.o -o bin/dearrow-x32.exe -mwindows -lgdi32 -ladvapi32 -lshell32 -nostartfiles -e _WinMainCRTStartup@0 -Os -s -fno-exceptions -fno-rtti -ffunction-sections -fdata-sections "-Wl,--gc-sections"
 ```
