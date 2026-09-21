@@ -337,7 +337,130 @@ bool ToggleArrows(bool remove) {
   return success;
 }
 
+bool ArgEquals(LPCWSTR arg, LPCWSTR opt1, LPCWSTR opt2 = NULL, LPCWSTR opt3 = NULL, LPCWSTR opt4 = NULL, LPCWSTR opt5 = NULL) {
+  if (lstrcmpiW(arg, opt1) == 0) return true;
+  if (opt2 && lstrcmpiW(arg, opt2) == 0) return true;
+  if (opt3 && lstrcmpiW(arg, opt3) == 0) return true;
+  if (opt4 && lstrcmpiW(arg, opt4) == 0) return true;
+  if (opt5 && lstrcmpiW(arg, opt5) == 0) return true;
+  return false;
+}
+
+void PrintHelp() {
+  PrintStr("DeArrow CLI - Toggle Windows Shortcut Arrow Overlays\n\n");
+  PrintStr("Usage: dearrow-cli [action] [restart-option]\n\n");
+  PrintStr("Actions:\n");
+  PrintStr("  -rm, --remove, /rm    Hide shortcut arrows\n");
+  PrintStr("  -rs, --restore, /rs   Restore default shortcut arrows\n\n");
+  PrintStr("Restart Options:\n");
+  PrintStr("  -y,  --yes,    /y     Restart Windows Explorer automatically\n");
+  PrintStr("  -n,  --no,     /n     Do not restart Windows Explorer\n\n");
+  PrintStr("Other:\n");
+  PrintStr("  -h,  --help,   /?     Show this help message\n\n");
+  PrintStr("If run with no arguments, interactive mode will launch.\n");
+}
+
 extern "C" void __stdcall mainCRTStartup() {
+  int numArgs = 0;
+  LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &numArgs);
+
+  if (argv != NULL && numArgs > 1) {
+    bool hasAction = false;
+    bool remove = false;
+    bool hasRestart = false;
+    bool restart = false;
+    bool showHelp = false;
+
+    for (int i = 1; i < numArgs; i++) {
+      if (ArgEquals(argv[i], L"-h", L"--help", L"/?", L"-?", L"/h")) {
+        showHelp = true;
+      } else if (ArgEquals(argv[i], L"-rm", L"--remove", L"/rm", L"remove", L"rm")) {
+        hasAction = true;
+        remove = true;
+      } else if (ArgEquals(argv[i], L"-rs", L"--restore", L"/rs", L"restore", L"rs")) {
+        hasAction = true;
+        remove = false;
+      } else if (ArgEquals(argv[i], L"-y", L"--yes", L"/y", L"yes", L"y")) {
+        hasRestart = true;
+        restart = true;
+      } else if (ArgEquals(argv[i], L"-n", L"--no", L"/n", L"no", L"n")) {
+        hasRestart = true;
+        restart = false;
+      } else {
+        PrintStr("\nUnknown option: ");
+        char buf[128];
+        WideCharToMultiByte(CP_ACP, 0, argv[i], -1, buf, sizeof(buf), NULL, NULL);
+        PrintStr(buf);
+        PrintStr("\n\n");
+        showHelp = true;
+      }
+    }
+
+    LocalFree(argv);
+
+    if (showHelp) {
+      PrintHelp();
+      ExitProcess(0);
+    }
+
+    if (hasAction) {
+      if (remove) {
+        PrintStr("> Removing shortcut arrows...\n");
+      } else {
+        PrintStr("> Restoring default shortcut arrows...\n");
+      }
+
+      if (ToggleArrows(remove)) {
+        PrintStr("\nRegistry updated successfully!\n");
+        if (hasRestart) {
+          if (restart) {
+            PrintStr("> Restarting Windows Explorer...\n");
+            RestartExplorerUnelevated();
+            if (!remove) {
+              RemoveBlankIconFile();
+            }
+          } else {
+            PrintStr("> Changes will apply on next boot or when Windows Explorer is restarted.\n");
+            if (!remove) {
+              RemoveBlankIconFile();
+            }
+          }
+          ExitProcess(0);
+        } else {
+          while (true) {
+            PrintStr("\n> Would you like to restart Windows Explorer now to apply changes? (y/n): ");
+            char input[64];
+            if (!ReadLine(input, sizeof(input))) {
+              ExitProcess(0);
+            }
+            if (StringEqualsIgnoreCase(input, "y")) {
+              RestartExplorerUnelevated();
+              if (!remove) {
+                RemoveBlankIconFile();
+              }
+              ExitProcess(0);
+            } else if (StringEqualsIgnoreCase(input, "n")) {
+              PrintStr("\n> Changes will apply on next boot or when Windows Explorer is restarted.\n\n");
+              PrintStr("> Press any key to close...\n");
+              WaitKey();
+              if (!remove) {
+                RemoveBlankIconFile();
+              }
+              ExitProcess(0);
+            } else {
+              PrintStr("\nInvalid choice. Please type 'y' or 'n'.\n");
+            }
+          }
+        }
+      } else {
+        PrintStr("\nFailed to update registry. Make sure you are running as Administrator.\n");
+        ExitProcess(1);
+      }
+    }
+  } else if (argv != NULL) {
+    LocalFree(argv);
+  }
+
   char input[64];
 
   while (true) {

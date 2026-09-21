@@ -207,7 +207,16 @@ void RestartExplorerUnelevated() {
     }
 }
 
-void ToggleArrows(bool remove, HWND hWnd) {
+bool ArgEquals(LPCWSTR arg, LPCWSTR opt1, LPCWSTR opt2 = NULL, LPCWSTR opt3 = NULL, LPCWSTR opt4 = NULL, LPCWSTR opt5 = NULL) {
+    if (lstrcmpiW(arg, opt1) == 0) return true;
+    if (opt2 && lstrcmpiW(arg, opt2) == 0) return true;
+    if (opt3 && lstrcmpiW(arg, opt3) == 0) return true;
+    if (opt4 && lstrcmpiW(arg, opt4) == 0) return true;
+    if (opt5 && lstrcmpiW(arg, opt5) == 0) return true;
+    return false;
+}
+
+bool ApplyArrowsRegistry(bool remove, HWND hWnd) {
     HKEY hKey;
     LSTATUS status = RegCreateKeyExA(
         HKEY_LOCAL_MACHINE,
@@ -225,26 +234,26 @@ void ToggleArrows(bool remove, HWND hWnd) {
                 status = RegSetValueExA(hKey, "29", 0, REG_SZ, (const BYTE *)regValue, lstrlenA(regValue) + 1);
                 if (status == ERROR_SUCCESS) {
                     success = true;
-                } else {
+                } else if (hWnd != NULL) {
                     char buf[100];
                     wsprintfA(buf, "RegSetValueExA failed with error: %d", status);
                     MessageBoxA(hWnd, buf, "Error", MB_ICONERROR);
                 }
-            } else {
-                MessageBoxA(hWnd, "Failed to create hidden blank icon file.", "Error", MB_ICONERROR);
+            } else if (hWnd != NULL) {
+                MessageBoxA(hWnd, "Failed to create blank icon file.", "Error", MB_ICONERROR);
             }
         } else {
             status = RegDeleteValueA(hKey, "29");
             if (status == ERROR_SUCCESS || status == ERROR_FILE_NOT_FOUND) {
                 success = true;
-            } else {
+            } else if (hWnd != NULL) {
                 char buf[100];
                 wsprintfA(buf, "RegDeleteValueA failed with error: %d", status);
                 MessageBoxA(hWnd, buf, "Error", MB_ICONERROR);
             }
         }
         RegCloseKey(hKey);
-    } else {
+    } else if (hWnd != NULL) {
         char buf[100];
         wsprintfA(buf, "RegCreateKeyExA failed with error: %d", status);
         MessageBoxA(hWnd, buf, "Error", MB_ICONERROR);
@@ -252,7 +261,12 @@ void ToggleArrows(bool remove, HWND hWnd) {
 
     if (success) {
         SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, NULL, NULL);
+    }
+    return success;
+}
 
+void ToggleArrows(bool remove, HWND hWnd) {
+    if (ApplyArrowsRegistry(remove, hWnd)) {
         int choice = MessageBoxA(
             hWnd,
             "Registry updated successfully!\n\nWindows Explorer must be restarted to apply the changes. Would you like to restart Explorer now?",
@@ -315,6 +329,73 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 }
 
 extern "C" void __stdcall WinMainCRTStartup() {
+    int numArgs = 0;
+    LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &numArgs);
+
+    if (argv != NULL && numArgs > 1) {
+        bool hasAction = false;
+        bool remove = false;
+        bool hasRestart = false;
+        bool restart = false;
+        bool showHelp = false;
+
+        for (int i = 1; i < numArgs; i++) {
+            if (ArgEquals(argv[i], L"-h", L"--help", L"/?", L"-?", L"/h")) {
+                showHelp = true;
+            } else if (ArgEquals(argv[i], L"-rm", L"--remove", L"/rm", L"remove", L"rm")) {
+                hasAction = true;
+                remove = true;
+            } else if (ArgEquals(argv[i], L"-rs", L"--restore", L"/rs", L"restore", L"rs")) {
+                hasAction = true;
+                remove = false;
+            } else if (ArgEquals(argv[i], L"-y", L"--yes", L"/y", L"yes", L"y")) {
+                hasRestart = true;
+                restart = true;
+            } else if (ArgEquals(argv[i], L"-n", L"--no", L"/n", L"no", L"n")) {
+                hasRestart = true;
+                restart = false;
+            }
+        }
+
+        LocalFree(argv);
+
+        if (showHelp) {
+            MessageBoxA(
+                NULL,
+                "DeArrow - Toggle Windows Shortcut Arrow Overlays\n\n"
+                "Usage:\n"
+                "  dearrow [action] [restart-option]\n\n"
+                "Actions:\n"
+                "  -rm, --remove, /rm    Hide shortcut arrows\n"
+                "  -rs, --restore, /rs   Restore default shortcut arrows\n\n"
+                "Restart Options:\n"
+                "  -y,  --yes,    /y     Restart Windows Explorer automatically\n"
+                "  -n,  --no,     /n     Do not restart Windows Explorer\n\n"
+                "Running without flags opens the graphical interface.",
+                "DeArrow Help", MB_OK | MB_ICONINFORMATION
+            );
+            ExitProcess(0);
+        }
+
+        if (hasAction) {
+            if (hasRestart) {
+                if (ApplyArrowsRegistry(remove, NULL)) {
+                    if (restart) {
+                        RestartExplorerUnelevated();
+                    }
+                    if (!remove) {
+                        RemoveBlankIconFile();
+                    }
+                }
+            } else {
+                ToggleArrows(remove, NULL);
+            }
+            ExitProcess(0);
+        }
+    } else if (argv != NULL) {
+        LocalFree(argv);
+    }
+
     HINSTANCE hInst = GetModuleHandleA(NULL);
 
     WNDCLASSEXA wc = {0};

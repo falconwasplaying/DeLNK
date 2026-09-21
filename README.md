@@ -28,8 +28,34 @@ A simple lightweight portable Windows utility designed to toggle shortcut overla
 3. Type `remove` (or `rm`) or `restore` (or `rs`) (case-insensitive) and press **Enter**.
 4. Type `y` to restart Windows Explorer now, or `n` to exit.
 
+### Command-Line Flags
+
+Both the GUI and CLI versions support command-line arguments for quick execution or scripted automation (run an elevated Command Prompt or PowerShell terminal):
+
+```bash
+# Hide arrows and automatically restart Explorer immediately
+dearrow-x64.exe -rm -y
+dearrow-cli-x64.exe -rm -y
+
+# Restore default arrows and automatically restart Explorer immediately
+dearrow-x64.exe -rs -y
+dearrow-cli-x64.exe -rs -y
+
+# Apply changes without restarting Explorer
+dearrow-x64.exe -rm -n
+dearrow-cli-x64.exe -rs -n
+```
+
+| Flag | Description |
+| :--- | :--- |
+| `-rm`, `--remove`, `/rm` | Hide shortcut overlay arrows |
+| `-rs`, `--restore`, `/rs` | Restore default shortcut overlay arrows |
+| `-y`, `--yes`, `/y` | Automatically restart Windows Explorer without prompting |
+| `-n`, `--no`, `/n` | Apply changes without restarting Windows Explorer |
+| `-h`, `--help`, `/?` | Display usage and available flags |
+
 > [!Note]
-> If you choose to not restart Windows Explorer immediately, the changes may remain until next boot or whenever Windows Explorer is restarted, whether that's manually or not. This applies to both the CLI tool and the GUI application.
+> If you choose not to restart Windows Explorer immediately, changes will apply on next boot or whenever Windows Explorer is restarted.
 
 ---
 
