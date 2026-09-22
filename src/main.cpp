@@ -4,7 +4,7 @@
 
 bool ExtractBlankIcon(char *outPath, DWORD maxLen) {
     char targetDir[MAX_PATH];
-    if (ExpandEnvironmentStringsA("%ProgramData%\\DeArrow", targetDir, sizeof(targetDir)) == 0) {
+    if (ExpandEnvironmentStringsA("%ProgramData%\\DeLNK", targetDir, sizeof(targetDir)) == 0) {
         return false;
     }
 
@@ -37,6 +37,14 @@ bool ExtractBlankIcon(char *outPath, DWORD maxLen) {
 
 void RemoveBlankIconFile() {
     char targetPath[MAX_PATH];
+    if (ExpandEnvironmentStringsA("%ProgramData%\\DeLNK\\blank.ico", targetPath, sizeof(targetPath)) > 0) {
+        SetFileAttributesA(targetPath, FILE_ATTRIBUTE_NORMAL);
+        DeleteFileA(targetPath);
+    }
+    if (ExpandEnvironmentStringsA("%ProgramData%\\DeLNK", targetPath, sizeof(targetPath)) > 0) {
+        RemoveDirectoryA(targetPath);
+    }
+    // Also clean up legacy %ProgramData%\DeArrow and %LOCALAPPDATA%\DeArrow if present
     if (ExpandEnvironmentStringsA("%ProgramData%\\DeArrow\\blank.ico", targetPath, sizeof(targetPath)) > 0) {
         SetFileAttributesA(targetPath, FILE_ATTRIBUTE_NORMAL);
         DeleteFileA(targetPath);
@@ -44,7 +52,6 @@ void RemoveBlankIconFile() {
     if (ExpandEnvironmentStringsA("%ProgramData%\\DeArrow", targetPath, sizeof(targetPath)) > 0) {
         RemoveDirectoryA(targetPath);
     }
-    // Also clean up legacy %LOCALAPPDATA%\DeArrow if present
     if (ExpandEnvironmentStringsA("%LOCALAPPDATA%\\DeArrow\\blank.ico", targetPath, sizeof(targetPath)) > 0) {
         SetFileAttributesA(targetPath, FILE_ATTRIBUTE_NORMAL);
         DeleteFileA(targetPath);
@@ -362,9 +369,9 @@ extern "C" void __stdcall WinMainCRTStartup() {
         if (showHelp) {
             MessageBoxA(
                 NULL,
-                "DeArrow - Toggle Windows Shortcut Arrow Overlays\n\n"
+                "DeLNK - Toggle Windows Shortcut Arrow Overlays\n\n"
                 "Usage:\n"
-                "  dearrow [action] [restart-option]\n\n"
+                "  delnk [action] [restart-option]\n\n"
                 "Actions:\n"
                 "  -rm, --remove, /rm    Hide shortcut arrows\n"
                 "  -rs, --restore, /rs   Restore default shortcut arrows\n\n"
@@ -372,7 +379,7 @@ extern "C" void __stdcall WinMainCRTStartup() {
                 "  -y,  --yes,    /y     Restart Windows Explorer automatically\n"
                 "  -n,  --no,     /n     Do not restart Windows Explorer\n\n"
                 "Running without flags opens the graphical interface.",
-                "DeArrow Help", MB_OK | MB_ICONINFORMATION
+                "DeLNK Help", MB_OK | MB_ICONINFORMATION
             );
             ExitProcess(0);
         }
@@ -411,7 +418,7 @@ extern "C" void __stdcall WinMainCRTStartup() {
     RegisterClassExA(&wc);
 
     HWND hWnd = CreateWindowExA(
-        WS_EX_TOPMOST, wc.lpszClassName, "DeArrow",
+        WS_EX_TOPMOST, wc.lpszClassName, "DeLNK",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU, CW_USEDEFAULT,
         CW_USEDEFAULT, 300, 115, NULL, NULL, hInst, NULL
     );

@@ -1,4 +1,4 @@
-# DeArrow
+# DeLNK
 
 A simple lightweight portable Windows utility designed to toggle shortcut overlay arrows on and off, made to be as optimised as can be and is completely native to Windows, containing _zero_ external dependencies, thus only taking 12 KB of storage space, also able to run with a very low memory footprint, using 1.2 MB of ram, your numbers may vary.
 
@@ -11,19 +11,19 @@ A simple lightweight portable Windows utility designed to toggle shortcut overla
 ## How to Use
 
 * **Two Formats Available**:
-  * **`dearrow-x64.exe / dearrow-x32.exe`**: A simple graphical interface.
-  * **`dearrow-cli-x64.exe / dearrow-cli-x32.exe`**: An interactive command-line tool.
+  * **`delnk-x64.exe / delnk-x32.exe`**: A simple graphical interface.
+  * **`delnk-cli-x64.exe / delnk-cli-x32.exe`**: An interactive command-line tool.
 
-### Graphical User Interface (`dearrow-x64.exe / dearrow-x32.exe`)
+### Graphical User Interface (`delnk-x64.exe / delnk-x32.exe`)
 
-1. Run `dearrow-x64.exe` or `dearrow-x32.exe`.
+1. Run `delnk-x64.exe` or `delnk-x32.exe`.
 2. Accept the User Account Control (UAC) prompt to run as Administrator.
 3. Click **Remove Arrows** to hide them, or **Restore Default** to bring them back.
 4. Click **Yes** when prompted to restart Windows Explorer to apply changes immediately, or **No** to exit.
 
-### Command-Line Interface (`dearrow-cli-x64.exe / dearrow-cli-x32.exe`)
+### Command-Line Interface (`delnk-cli-x64.exe / delnk-cli-x32.exe`)
 
-1. Run `dearrow-cli-x64.exe` or `dearrow-cli-x32.exe`.
+1. Run `delnk-cli-x64.exe` or `delnk-cli-x32.exe`.
 2. Accept the UAC prompt to run as Administrator.
 3. Type `remove` (or `rm`) or `restore` (or `rs`) (case-insensitive) and press **Enter**.
 4. Type `y` to restart Windows Explorer now, or `n` to exit.
@@ -34,16 +34,16 @@ Both the GUI and CLI versions support command-line arguments for quick execution
 
 ```bash
 # Hide arrows and automatically restart Explorer immediately
-dearrow-x64.exe -rm -y
-dearrow-cli-x64.exe -rm -y
+delnk-x64.exe -rm -y
+delnk-cli-x64.exe -rm -y
 
 # Restore default arrows and automatically restart Explorer immediately
-dearrow-x64.exe -rs -y
-dearrow-cli-x64.exe -rs -y
+delnk-x64.exe -rs -y
+delnk-cli-x64.exe -rs -y
 
 # Apply changes without restarting Explorer
-dearrow-x64.exe -rm -n
-dearrow-cli-x64.exe -rs -n
+delnk-x64.exe -rm -n
+delnk-cli-x64.exe -rs -n
 ```
 
 | Flag | Description |
@@ -68,17 +68,17 @@ You'll need MinGW-w64/UCRT64 and MinGW-w32 installed (via [MSYS2](https://www.ms
 Open the **MSYS2 UCRT64** (or **MinGW-w64**) terminal, and go to your project directory:
 
 ```bash
-cd /c/users/username/documents/dearrow
+cd /c/users/username/documents/delnk
 ```
 
-> replace "/c/users/username/documents/dearrow" with your project directory
+> replace "/c/users/username/documents/delnk" with your project directory
 
 Now run:
 
 ```bash
 mkdir -p bin
 windres -i res/resources-x64.rc -I res -O coff -o bin/rsc-x64.o
-g++ src/main.cpp bin/rsc-x64.o -o bin/dearrow-x64.exe -mwindows -lgdi32 -ladvapi32 -lshell32 -nostartfiles -e WinMainCRTStartup -Os -s -fno-exceptions -fno-rtti -ffunction-sections -fdata-sections "-Wl,--gc-sections"
+g++ src/main.cpp bin/rsc-x64.o -o bin/delnk-x64.exe -mwindows -lgdi32 -ladvapi32 -lshell32 -nostartfiles -e WinMainCRTStartup -Os -s -fno-exceptions -fno-rtti -ffunction-sections -fdata-sections "-Wl,--gc-sections"
 ```
 
 ### 32-bit gui build
@@ -86,17 +86,17 @@ g++ src/main.cpp bin/rsc-x64.o -o bin/dearrow-x64.exe -mwindows -lgdi32 -ladvapi
 Open the **MinGW-w32** terminal, and go to your project directory:
 
 ```bash
-cd /c/users/username/documents/dearrow
+cd /c/users/username/documents/delnk
 ```
 
-> replace "/c/users/username/documents/dearrow" with your project directory
+> replace "/c/users/username/documents/delnk" with your project directory
 
 Now run:
 
 ```bash
 mkdir -p bin
 windres -i res/resources-x32.rc -I res -O coff -o bin/rsc-x32.o
-g++ src/main.cpp bin/rsc-x32.o -o bin/dearrow-x32.exe -mwindows -lgdi32 -ladvapi32 -lshell32 -nostartfiles -e _WinMainCRTStartup@0 -Os -s -fno-exceptions -fno-rtti -ffunction-sections -fdata-sections -static-libgcc -Wl,--gc-sections
+g++ src/main.cpp bin/rsc-x32.o -o bin/delnk-x32.exe -mwindows -lgdi32 -ladvapi32 -lshell32 -nostartfiles -e _WinMainCRTStartup@0 -Os -s -fno-exceptions -fno-rtti -ffunction-sections -fdata-sections -static-libgcc -Wl,--gc-sections
 ```
 
 > [!Tip]
@@ -109,18 +109,18 @@ g++ src/main.cpp bin/rsc-x32.o -o bin/dearrow-x32.exe -mwindows -lgdi32 -ladvapi
 Open the **MSYS2 UCRT64** (or **MinGW-w64**) terminal, and go to your project directory:
 
 ```bash
-cd /c/users/username/documents/dearrow
+cd /c/users/username/documents/delnk
 ```
 
 > [!Important]
-> replace "/c/users/username/documents/dearrow" with your project directory
+> replace "/c/users/username/documents/delnk" with your project directory
 
 Now run:
 
 ```bash
 mkdir -p bin
 windres -i res/resources-cli-x64.rc -I res -O coff -o bin/rsc-cli-x64.o
-g++ src/cli.cpp bin/rsc-cli-x64.o -o bin/dearrow-cli-x64.exe -mconsole -ladvapi32 -lshell32 -nostartfiles -e mainCRTStartup -Os -s -fno-exceptions -fno-rtti -ffunction-sections -fdata-sections -Wl,--gc-sections
+g++ src/cli.cpp bin/rsc-cli-x64.o -o bin/delnk-cli-x64.exe -mconsole -ladvapi32 -lshell32 -nostartfiles -e mainCRTStartup -Os -s -fno-exceptions -fno-rtti -ffunction-sections -fdata-sections -Wl,--gc-sections
 ```
 
 ### 32-bit cli build
@@ -128,18 +128,18 @@ g++ src/cli.cpp bin/rsc-cli-x64.o -o bin/dearrow-cli-x64.exe -mconsole -ladvapi3
 Open the **MinGW-w32** terminal, and go to your project directory:
 
 ```bash
-cd /c/users/username/documents/dearrow
+cd /c/users/username/documents/delnk
 ```
 
 > [!Important]
-> replace "/c/users/username/documents/dearrow" with your project directory
+> replace "/c/users/username/documents/delnk" with your project directory
 
 Now run:
 
 ```bash
 mkdir -p bin
 windres -i res/resources-cli-x32.rc -I res -O coff -o bin/rsc-cli-x32.o
-g++ src/cli.cpp bin/rsc-cli-x32.o -o bin/dearrow-cli-x32.exe -mconsole -ladvapi32 -lshell32 -nostartfiles -e _mainCRTStartup@0 -Os -s -fno-exceptions -fno-rtti -ffunction-sections -fdata-sections -static-libgcc -Wl,--gc-sections
+g++ src/cli.cpp bin/rsc-cli-x32.o -o bin/delnk-cli-x32.exe -mconsole -ladvapi32 -lshell32 -nostartfiles -e _mainCRTStartup@0 -Os -s -fno-exceptions -fno-rtti -ffunction-sections -fdata-sections -static-libgcc -Wl,--gc-sections
 ```
 
 ### If not using MSYS2
@@ -152,9 +152,9 @@ mkdir -p bin
 
 # 64-bit
 x86_64-w64-mingw32-windres -i res/resources-x64.rc -I res -O coff -o bin/rsc-x64.o
-x86_64-w64-mingw32-g++ src/main.cpp bin/rsc-x64.o -o bin/dearrow-x64.exe -mwindows -lgdi32 -ladvapi32 -lshell32 -nostartfiles -e WinMainCRTStartup -Os -s -fno-exceptions -fno-rtti -ffunction-sections -fdata-sections "-Wl,--gc-sections"
+x86_64-w64-mingw32-g++ src/main.cpp bin/rsc-x64.o -o bin/delnk-x64.exe -mwindows -lgdi32 -ladvapi32 -lshell32 -nostartfiles -e WinMainCRTStartup -Os -s -fno-exceptions -fno-rtti -ffunction-sections -fdata-sections "-Wl,--gc-sections"
 
 # 32-bit
 i686-w64-mingw32-windres -i res/resources-x32.rc -I res -O coff -o bin/rsc-x32.o
-i686-w64-mingw32-g++ src/main.cpp bin/rsc-x32.o -o bin/dearrow-x32.exe -mwindows -lgdi32 -ladvapi32 -lshell32 -nostartfiles -e _WinMainCRTStartup@0 -Os -s -fno-exceptions -fno-rtti -ffunction-sections -fdata-sections "-Wl,--gc-sections"
+i686-w64-mingw32-g++ src/main.cpp bin/rsc-x32.o -o bin/delnk-x32.exe -mwindows -lgdi32 -ladvapi32 -lshell32 -nostartfiles -e _WinMainCRTStartup@0 -Os -s -fno-exceptions -fno-rtti -ffunction-sections -fdata-sections "-Wl,--gc-sections"
 ```

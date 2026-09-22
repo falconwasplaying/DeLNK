@@ -1,12 +1,12 @@
-1 ICON "dearrow.ico"
+1 ICON "delnk.ico"
 1 24 "manifest.xml"
 101 RCDATA "blank.ico"
 
 #include <winver.h>
 
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION             1,2,0,0
-PRODUCTVERSION          1,2,0,0
+FILEVERSION             1,0,0,0
+PRODUCTVERSION          1,0,0,0
 FILEFLAGSMASK           VS_FFI_FILEFLAGSMASK
 FILEFLAGS               0x0L
 FILEOS                  VOS_NT_WINDOWS32
@@ -18,13 +18,13 @@ BEGIN
         BLOCK "040904b0" // U.S. English, Unicode
         BEGIN
             VALUE "CompanyName",      "Alfahad Sheikh"
-            VALUE "FileDescription",  "DeArrow"
-            VALUE "FileVersion",      "1.2.0.0"
-            VALUE "InternalName",     "dearrow-x64"
+            VALUE "FileDescription",  "DeLNK"
+            VALUE "FileVersion",      "1.0.0.0"
+            VALUE "InternalName",     "delnk-x64"
             VALUE "LegalCopyright",   "Copyright (C) 2026 Alfahad Sheikh"
-            VALUE "OriginalFilename", "dearrow-x64.exe"
-            VALUE "ProductName",      "DeArrow"
-            VALUE "ProductVersion",   "1.2.0.0"
+            VALUE "OriginalFilename", "delnk-x64.exe"
+            VALUE "ProductName",      "DeLNK"
+            VALUE "ProductVersion",   "1.0.0.0"
         END
     END
     BLOCK "VarFileInfo"

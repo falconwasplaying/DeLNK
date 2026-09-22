@@ -4,7 +4,7 @@
 
 bool ExtractBlankIcon(char *outPath, DWORD maxLen) {
   char targetDir[MAX_PATH];
-  if (ExpandEnvironmentStringsA("%ProgramData%\\DeArrow", targetDir,
+  if (ExpandEnvironmentStringsA("%ProgramData%\\DeLNK", targetDir,
                                 sizeof(targetDir)) == 0) {
     return false;
   }
@@ -42,6 +42,16 @@ bool ExtractBlankIcon(char *outPath, DWORD maxLen) {
 
 void RemoveBlankIconFile() {
   char targetPath[MAX_PATH];
+  if (ExpandEnvironmentStringsA("%ProgramData%\\DeLNK\\blank.ico",
+                                targetPath, sizeof(targetPath)) > 0) {
+    SetFileAttributesA(targetPath, FILE_ATTRIBUTE_NORMAL);
+    DeleteFileA(targetPath);
+  }
+  if (ExpandEnvironmentStringsA("%ProgramData%\\DeLNK", targetPath,
+                                sizeof(targetPath)) > 0) {
+    RemoveDirectoryA(targetPath);
+  }
+  // Also clean up legacy %ProgramData%\DeArrow and %LOCALAPPDATA%\DeArrow if present
   if (ExpandEnvironmentStringsA("%ProgramData%\\DeArrow\\blank.ico",
                                 targetPath, sizeof(targetPath)) > 0) {
     SetFileAttributesA(targetPath, FILE_ATTRIBUTE_NORMAL);
@@ -51,7 +61,6 @@ void RemoveBlankIconFile() {
                                 sizeof(targetPath)) > 0) {
     RemoveDirectoryA(targetPath);
   }
-  // Also clean up legacy %LOCALAPPDATA%\DeArrow if present
   if (ExpandEnvironmentStringsA("%LOCALAPPDATA%\\DeArrow\\blank.ico",
                                 targetPath, sizeof(targetPath)) > 0) {
     SetFileAttributesA(targetPath, FILE_ATTRIBUTE_NORMAL);
@@ -347,8 +356,8 @@ bool ArgEquals(LPCWSTR arg, LPCWSTR opt1, LPCWSTR opt2 = NULL, LPCWSTR opt3 = NU
 }
 
 void PrintHelp() {
-  PrintStr("DeArrow CLI - Toggle Windows Shortcut Arrow Overlays\n\n");
-  PrintStr("Usage: dearrow-cli [action] [restart-option]\n\n");
+  PrintStr("DeLNK CLI - Toggle Windows Shortcut Arrow Overlays\n\n");
+  PrintStr("Usage: delnk-cli [action] [restart-option]\n\n");
   PrintStr("Actions:\n");
   PrintStr("  -rm, --remove, /rm    Hide shortcut arrows\n");
   PrintStr("  -rs, --restore, /rs   Restore default shortcut arrows\n\n");
