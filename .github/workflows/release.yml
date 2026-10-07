@@ -22,7 +22,7 @@ jobs:
       - name: Install MinGW-w64 Toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y mingw-w64
+          sudo apt-get install -y --no-install-recommends g++-mingw-w64-x86-64 g++-mingw-w64-i686 binutils-mingw-w64
 
       - name: Build All Binaries
         run: |
@@ -87,3 +87,7 @@ jobs:
             bin/delnk-cli-x32.exe
             bin/SHA256SUMS.txt
           generate_release_notes: true
+          append_body: true
+          body: |
+            ---
+            *Automated build: Binaries were compiled directly from source by GitHub Actions using the MinGW-w64 toolchain. Verify file integrity with `SHA256SUMS.txt`.*
