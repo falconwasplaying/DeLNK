@@ -1,6 +1,8 @@
 #define _WIN32_WINNT 0x0600
-#include <shlobj.h>
 #include <windows.h>
+#include <sddl.h>
+#include <shlobj.h>
+#include <tlhelp32.h>
 
 bool ExtractBlankIcon(char *outPath, DWORD maxLen) {
     char targetDir[MAX_PATH];
@@ -35,14 +37,22 @@ bool ExtractBlankIcon(char *outPath, DWORD maxLen) {
     return (written == size);
 }
 
-void RemoveBlankIconFile() {
+void RemoveBlankIconFile(bool delayUntilReboot = false) {
     char targetPath[MAX_PATH];
     if (ExpandEnvironmentStringsA("%ProgramData%\\DeLNK\\blank.ico", targetPath, sizeof(targetPath)) > 0) {
         SetFileAttributesA(targetPath, FILE_ATTRIBUTE_NORMAL);
-        DeleteFileA(targetPath);
+        if (delayUntilReboot) {
+            MoveFileExA(targetPath, NULL, MOVEFILE_DELAY_UNTIL_REBOOT);
+        } else {
+            DeleteFileA(targetPath);
+        }
     }
     if (ExpandEnvironmentStringsA("%ProgramData%\\DeLNK", targetPath, sizeof(targetPath)) > 0) {
-        RemoveDirectoryA(targetPath);
+        if (delayUntilReboot) {
+            MoveFileExA(targetPath, NULL, MOVEFILE_DELAY_UNTIL_REBOOT);
+        } else {
+            RemoveDirectoryA(targetPath);
+        }
     }
     // Also clean up legacy %ProgramData%\DeArrow and %LOCALAPPDATA%\DeArrow if present
     if (ExpandEnvironmentStringsA("%ProgramData%\\DeArrow\\blank.ico", targetPath, sizeof(targetPath)) > 0) {
@@ -77,16 +87,20 @@ bool EnablePrivilege(const char *privilegeName) {
     return true;
 }
 
-void ClearIconCache() {
-    char localAppData[MAX_PATH];
-    if (ExpandEnvironmentStringsA("%LOCALAPPDATA%", localAppData, sizeof(localAppData)) == 0) {
+void ClearIconCacheInDir(const char *localAppData) {
+    if (!localAppData || localAppData[0] == '\0') {
         return;
     }
 
     char iconCacheFile[MAX_PATH];
     wsprintfA(iconCacheFile, "%s\\IconCache.db", localAppData);
     SetFileAttributesA(iconCacheFile, FILE_ATTRIBUTE_NORMAL);
-    DeleteFileA(iconCacheFile);
+    for (int r = 0; r < 5; r++) {
+        if (DeleteFileA(iconCacheFile) || GetLastError() == ERROR_FILE_NOT_FOUND) {
+            break;
+        }
+        Sleep(50);
+    }
 
     char explorerDir[MAX_PATH];
     wsprintfA(explorerDir, "%s\\Microsoft\\Windows\\Explorer\\iconcache_*.db", localAppData);
@@ -98,42 +112,108 @@ void ClearIconCache() {
             char filePath[MAX_PATH];
             wsprintfA(filePath, "%s\\Microsoft\\Windows\\Explorer\\%s", localAppData, fd.cFileName);
             SetFileAttributesA(filePath, FILE_ATTRIBUTE_NORMAL);
-            DeleteFileA(filePath);
+            for (int r = 0; r < 5; r++) {
+                if (DeleteFileA(filePath) || GetLastError() == ERROR_FILE_NOT_FOUND) {
+                    break;
+                }
+                Sleep(50);
+            }
         } while (FindNextFileA(hFind, &fd));
         FindClose(hFind);
     }
 }
 
-void RestartExplorerUnelevated() {
-    EnablePrivilege("SeImpersonatePrivilege");
+void ClearAllIconCaches(HANDLE hUserToken) {
+    char localAppData[MAX_PATH];
+    if (ExpandEnvironmentStringsA("%LOCALAPPDATA%", localAppData, sizeof(localAppData)) > 0) {
+        ClearIconCacheInDir(localAppData);
+    }
 
-    HWND hWndTray = FindWindowA("Shell_TrayWnd", NULL);
+    if (hUserToken != NULL) {
+        DWORD dwSize = 0;
+        GetTokenInformation(hUserToken, TokenUser, NULL, 0, &dwSize);
+        if (dwSize > 0) {
+            BYTE *pBuf = (BYTE *)LocalAlloc(LPTR, dwSize);
+            if (pBuf != NULL) {
+                if (GetTokenInformation(hUserToken, TokenUser, pBuf, dwSize, &dwSize)) {
+                    TOKEN_USER *pTokenUser = (TOKEN_USER *)pBuf;
+                    LPSTR szSid = NULL;
+                    if (ConvertSidToStringSidA(pTokenUser->User.Sid, &szSid)) {
+                        char profileKey[MAX_PATH];
+                        wsprintfA(profileKey, "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\%s", szSid);
+                        HKEY hKey;
+                        if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, profileKey, 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+                            char profilePath[MAX_PATH];
+                            DWORD pathSize = sizeof(profilePath);
+                            DWORD type = 0;
+                            if (RegQueryValueExA(hKey, "ProfileImagePath", NULL, &type, (LPBYTE)profilePath, &pathSize) == ERROR_SUCCESS) {
+                                char expandedPath[MAX_PATH];
+                                if (ExpandEnvironmentStringsA(profilePath, expandedPath, sizeof(expandedPath)) > 0) {
+                                    char userLocalAppData[MAX_PATH];
+                                    wsprintfA(userLocalAppData, "%s\\AppData\\Local", expandedPath);
+                                    if (lstrcmpiA(localAppData, userLocalAppData) != 0) {
+                                        ClearIconCacheInDir(userLocalAppData);
+                                    }
+                                }
+                            }
+                            RegCloseKey(hKey);
+                        }
+                        LocalFree(szSid);
+                    }
+                }
+                LocalFree(pBuf);
+            }
+        }
+    }
+}
+
+void TerminateAllExplorerProcesses() {
+    HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (hSnap == INVALID_HANDLE_VALUE) return;
+
+    PROCESSENTRY32 pe;
+    pe.dwSize = sizeof(pe);
+    if (Process32First(hSnap, &pe)) {
+        do {
+            if (lstrcmpiA(pe.szExeFile, "explorer.exe") == 0) {
+                HANDLE hProc = OpenProcess(PROCESS_TERMINATE | SYNCHRONIZE, FALSE, pe.th32ProcessID);
+                if (hProc != NULL) {
+                    TerminateProcess(hProc, 0);
+                    WaitForSingleObject(hProc, 1000);
+                    CloseHandle(hProc);
+                }
+            }
+        } while (Process32Next(hSnap, &pe));
+    }
+    CloseHandle(hSnap);
+}
+
+HANDLE GetTargetUserToken() {
     HANDLE hNewToken = NULL;
-    HANDLE hExplorerProc = NULL;
-
+    HWND hWndTray = FindWindowA("Shell_TrayWnd", NULL);
     if (hWndTray != NULL) {
         DWORD dwPID = 0;
         GetWindowThreadProcessId(hWndTray, &dwPID);
         if (dwPID != 0) {
-            hExplorerProc = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_TERMINATE | SYNCHRONIZE, FALSE, dwPID);
-            if (hExplorerProc != NULL) {
+            HANDLE hProc = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, dwPID);
+            if (hProc != NULL) {
                 HANDLE hToken = NULL;
-                if (OpenProcessToken(hExplorerProc, TOKEN_DUPLICATE | TOKEN_ASSIGN_PRIMARY | TOKEN_QUERY, &hToken)) {
+                if (OpenProcessToken(hProc, TOKEN_DUPLICATE | TOKEN_ASSIGN_PRIMARY | TOKEN_QUERY, &hToken)) {
                     DuplicateTokenEx(hToken, TOKEN_ALL_ACCESS, NULL, SecurityImpersonation, TokenPrimary, &hNewToken);
                     CloseHandle(hToken);
                 }
+                CloseHandle(hProc);
             }
         }
     }
 
-    // Fallback: If tray window had no token, try Progman
     if (hNewToken == NULL) {
         HWND hWndProg = FindWindowA("Progman", NULL);
         if (hWndProg != NULL) {
             DWORD dwPID = 0;
             GetWindowThreadProcessId(hWndProg, &dwPID);
             if (dwPID != 0) {
-                HANDLE hProc = OpenProcess(PROCESS_QUERY_INFORMATION | SYNCHRONIZE, FALSE, dwPID);
+                HANDLE hProc = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, dwPID);
                 if (hProc != NULL) {
                     HANDLE hToken = NULL;
                     if (OpenProcessToken(hProc, TOKEN_DUPLICATE | TOKEN_ASSIGN_PRIMARY | TOKEN_QUERY, &hToken)) {
@@ -146,7 +226,6 @@ void RestartExplorerUnelevated() {
         }
     }
 
-    // Fallback: Query active console session token
     if (hNewToken == NULL) {
         HMODULE hWts = LoadLibraryA("wtsapi32.dll");
         if (hWts != NULL) {
@@ -163,23 +242,42 @@ void RestartExplorerUnelevated() {
         }
     }
 
-    // Signal graceful shutdown of the shell
+    return hNewToken;
+}
+
+void DeleteShellIconsSlot(HKEY hRoot, const char *subKey) {
+    HKEY hKey;
+    if (RegOpenKeyExA(hRoot, subKey, 0, KEY_READ | KEY_WRITE, &hKey) == ERROR_SUCCESS) {
+        RegDeleteValueA(hKey, "29");
+        DWORD numSubKeys = 0;
+        DWORD numValues = 0;
+        if (RegQueryInfoKeyA(hKey, NULL, NULL, NULL, &numSubKeys, NULL, NULL, &numValues, NULL, NULL, NULL, NULL) == ERROR_SUCCESS) {
+            if (numSubKeys == 0 && numValues == 0) {
+                RegCloseKey(hKey);
+                RegDeleteKeyA(hRoot, subKey);
+                return;
+            }
+        }
+        RegCloseKey(hKey);
+    }
+}
+
+void RestartExplorerUnelevated() {
+    EnablePrivilege("SeImpersonatePrivilege");
+
+    HANDLE hNewToken = GetTargetUserToken();
+
+    HWND hWndTray = FindWindowA("Shell_TrayWnd", NULL);
     if (hWndTray != NULL) {
         PostMessageA(hWndTray, WM_USER + 436, 0, 0);
     }
 
-    // Wait up to 2 seconds for graceful exit; forcibly terminate if it hangs
-    if (hExplorerProc != NULL) {
-        DWORD waitRes = WaitForSingleObject(hExplorerProc, 2000);
-        if (waitRes != WAIT_OBJECT_0) {
-            TerminateProcess(hExplorerProc, 0);
-            WaitForSingleObject(hExplorerProc, 1000);
-        }
-        CloseHandle(hExplorerProc);
-        hExplorerProc = NULL;
-    }
+    Sleep(500);
 
-    // Poll until Shell_TrayWnd and Progman are completely destroyed (up to 3 seconds)
+    // Terminate all remaining explorer.exe instances so iconcache files are completely unlocked
+    TerminateAllExplorerProcesses();
+
+    // Poll until all Explorer processes are dead (up to 3 seconds)
     for (int i = 0; i < 30; i++) {
         HWND tray = FindWindowA("Shell_TrayWnd", NULL);
         HWND prog = FindWindowA("Progman", NULL);
@@ -189,11 +287,10 @@ void RestartExplorerUnelevated() {
         Sleep(100);
     }
 
-    // Brief settling time for the window manager to finish unhooking the shell
-    Sleep(300);
+    Sleep(200);
 
     // Purge corrupted/stale icon caches while Explorer is dead
-    ClearIconCache();
+    ClearAllIconCaches(hNewToken);
 
     // Restart Explorer unelevated
     if (hNewToken != NULL) {
@@ -212,6 +309,9 @@ void RestartExplorerUnelevated() {
         }
         CloseHandle(hNewToken);
     }
+
+    Sleep(300);
+    SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, NULL, NULL);
 }
 
 bool ArgEquals(LPCWSTR arg, LPCWSTR opt1, LPCWSTR opt2 = NULL, LPCWSTR opt3 = NULL, LPCWSTR opt4 = NULL, LPCWSTR opt5 = NULL) {
@@ -224,21 +324,42 @@ bool ArgEquals(LPCWSTR arg, LPCWSTR opt1, LPCWSTR opt2 = NULL, LPCWSTR opt3 = NU
 }
 
 bool ApplyArrowsRegistry(bool remove, HWND hWnd) {
-    HKEY hKey;
-    LSTATUS status = RegCreateKeyExA(
-        HKEY_LOCAL_MACHINE,
-        "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Icons", 0,
-        NULL, REG_OPTION_NON_VOLATILE, KEY_WRITE | KEY_WOW64_64KEY, NULL, &hKey, NULL
-    );
-
+    const char *subKey = "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Icons";
     bool success = false;
-    if (status == ERROR_SUCCESS) {
-        if (remove) {
-            char iconPath[MAX_PATH];
-            char regValue[MAX_PATH + 10];
-            if (ExtractBlankIcon(iconPath, sizeof(iconPath))) {
-                wsprintfA(regValue, "%s,0", iconPath);
+
+    HANDLE hUserToken = GetTargetUserToken();
+    LPSTR szUserSid = NULL;
+    if (hUserToken != NULL) {
+        DWORD dwSize = 0;
+        GetTokenInformation(hUserToken, TokenUser, NULL, 0, &dwSize);
+        if (dwSize > 0) {
+            BYTE *pBuf = (BYTE *)LocalAlloc(LPTR, dwSize);
+            if (pBuf != NULL) {
+                if (GetTokenInformation(hUserToken, TokenUser, pBuf, dwSize, &dwSize)) {
+                    TOKEN_USER *pTokenUser = (TOKEN_USER *)pBuf;
+                    ConvertSidToStringSidA(pTokenUser->User.Sid, &szUserSid);
+                }
+                LocalFree(pBuf);
+            }
+        }
+        CloseHandle(hUserToken);
+    }
+
+    if (remove) {
+        char iconPath[MAX_PATH];
+        char regValue[MAX_PATH + 10];
+        if (ExtractBlankIcon(iconPath, sizeof(iconPath))) {
+            wsprintfA(regValue, "%s,0", iconPath);
+
+            HKEY hKey;
+            LSTATUS status = RegCreateKeyExA(
+                HKEY_LOCAL_MACHINE, subKey, 0,
+                NULL, REG_OPTION_NON_VOLATILE, KEY_WRITE | KEY_WOW64_64KEY, NULL, &hKey, NULL
+            );
+
+            if (status == ERROR_SUCCESS) {
                 status = RegSetValueExA(hKey, "29", 0, REG_SZ, (const BYTE *)regValue, lstrlenA(regValue) + 1);
+                RegCloseKey(hKey);
                 if (status == ERROR_SUCCESS) {
                     success = true;
                 } else if (hWnd != NULL) {
@@ -247,28 +368,37 @@ bool ApplyArrowsRegistry(bool remove, HWND hWnd) {
                     MessageBoxA(hWnd, buf, "Error", MB_ICONERROR);
                 }
             } else if (hWnd != NULL) {
-                MessageBoxA(hWnd, "Failed to create blank icon file.", "Error", MB_ICONERROR);
-            }
-        } else {
-            status = RegDeleteValueA(hKey, "29");
-            if (status == ERROR_SUCCESS || status == ERROR_FILE_NOT_FOUND) {
-                success = true;
-            } else if (hWnd != NULL) {
                 char buf[100];
-                wsprintfA(buf, "RegDeleteValueA failed with error: %d", status);
+                wsprintfA(buf, "RegCreateKeyExA failed with error: %d", status);
                 MessageBoxA(hWnd, buf, "Error", MB_ICONERROR);
             }
+
+            // Remove any conflicting override from HKCU and active user's hive
+            DeleteShellIconsSlot(HKEY_CURRENT_USER, subKey);
+            if (szUserSid != NULL) {
+                char userSubKey[MAX_PATH];
+                wsprintfA(userSubKey, "%s\\%s", szUserSid, subKey);
+                DeleteShellIconsSlot(HKEY_USERS, userSubKey);
+            }
+        } else if (hWnd != NULL) {
+            MessageBoxA(hWnd, "Failed to create blank icon file.", "Error", MB_ICONERROR);
         }
-        RegCloseKey(hKey);
-    } else if (hWnd != NULL) {
-        char buf[100];
-        wsprintfA(buf, "RegCreateKeyExA failed with error: %d", status);
-        MessageBoxA(hWnd, buf, "Error", MB_ICONERROR);
+    } else {
+        // Restore default: remove slot 29 and remove empty Shell Icons keys from HKLM, HKCU, and HKEY_USERS
+        DeleteShellIconsSlot(HKEY_LOCAL_MACHINE, subKey);
+        DeleteShellIconsSlot(HKEY_CURRENT_USER, subKey);
+        if (szUserSid != NULL) {
+            char userSubKey[MAX_PATH];
+            wsprintfA(userSubKey, "%s\\%s", szUserSid, subKey);
+            DeleteShellIconsSlot(HKEY_USERS, userSubKey);
+        }
+        success = true;
     }
 
-    if (success) {
-        SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, NULL, NULL);
+    if (szUserSid != NULL) {
+        LocalFree(szUserSid);
     }
+
     return success;
 }
 
@@ -281,6 +411,9 @@ void ToggleArrows(bool remove, HWND hWnd) {
         );
         if (choice == IDYES) {
             RestartExplorerUnelevated();
+            if (!remove) {
+                RemoveBlankIconFile(false);
+            }
         } else {
             ShowWindow(hWnd, SW_HIDE);
             MessageBoxA(
@@ -288,10 +421,9 @@ void ToggleArrows(bool remove, HWND hWnd) {
                 "Changes will apply on next boot or when Windows Explorer is restarted.",
                 "Notice", MB_OK | MB_ICONINFORMATION
             );
-        }
-
-        if (!remove) {
-            RemoveBlankIconFile();
+            if (!remove) {
+                RemoveBlankIconFile(true); // Delay deletion until next reboot
+            }
         }
     }
 }
@@ -389,9 +521,13 @@ extern "C" void __stdcall WinMainCRTStartup() {
                 if (ApplyArrowsRegistry(remove, NULL)) {
                     if (restart) {
                         RestartExplorerUnelevated();
-                    }
-                    if (!remove) {
-                        RemoveBlankIconFile();
+                        if (!remove) {
+                            RemoveBlankIconFile(false);
+                        }
+                    } else {
+                        if (!remove) {
+                            RemoveBlankIconFile(true);
+                        }
                     }
                 }
             } else {
