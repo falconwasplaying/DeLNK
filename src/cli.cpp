@@ -6,12 +6,14 @@
 
 bool ExtractBlankIcon(char *outPath, DWORD maxLen) {
   char targetDir[MAX_PATH];
-  if (ExpandEnvironmentStringsA("%ProgramData%\\DeLNK", targetDir,
-                                sizeof(targetDir)) == 0) {
-    return false;
+  bool useWinDir = (GetWindowsDirectoryA(targetDir, sizeof(targetDir)) > 0);
+  if (!useWinDir) {
+    if (ExpandEnvironmentStringsA("%ProgramData%\\DeLNK", targetDir,
+                                  sizeof(targetDir)) == 0) {
+      return false;
+    }
+    CreateDirectoryA(targetDir, NULL);
   }
-
-  CreateDirectoryA(targetDir, NULL);
 
   wsprintfA(outPath, "%s\\blank.ico", targetDir);
 
@@ -31,6 +33,15 @@ bool ExtractBlankIcon(char *outPath, DWORD maxLen) {
   SetFileAttributesA(outPath, FILE_ATTRIBUTE_NORMAL);
   HANDLE hFile = CreateFileA(outPath, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
                              FILE_ATTRIBUTE_NORMAL, NULL);
+  if (hFile == INVALID_HANDLE_VALUE && useWinDir) {
+    // Fall back to %ProgramData%\DeLNK if Windows directory was not writable
+    if (ExpandEnvironmentStringsA("%ProgramData%\\DeLNK", targetDir, sizeof(targetDir)) > 0) {
+      CreateDirectoryA(targetDir, NULL);
+      wsprintfA(outPath, "%s\\blank.ico", targetDir);
+      SetFileAttributesA(outPath, FILE_ATTRIBUTE_NORMAL);
+      hFile = CreateFileA(outPath, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    }
+  }
   if (hFile == INVALID_HANDLE_VALUE) {
     return false;
   }
@@ -44,6 +55,16 @@ bool ExtractBlankIcon(char *outPath, DWORD maxLen) {
 
 void RemoveBlankIconFile(bool delayUntilReboot = false) {
   char targetPath[MAX_PATH];
+  char winDir[MAX_PATH];
+  if (GetWindowsDirectoryA(winDir, sizeof(winDir)) > 0) {
+    wsprintfA(targetPath, "%s\\blank.ico", winDir);
+    SetFileAttributesA(targetPath, FILE_ATTRIBUTE_NORMAL);
+    if (delayUntilReboot) {
+      MoveFileExA(targetPath, NULL, MOVEFILE_DELAY_UNTIL_REBOOT);
+    } else {
+      DeleteFileA(targetPath);
+    }
+  }
   if (ExpandEnvironmentStringsA("%ProgramData%\\DeLNK\\blank.ico",
                                 targetPath, sizeof(targetPath)) > 0) {
     SetFileAttributesA(targetPath, FILE_ATTRIBUTE_NORMAL);
@@ -423,7 +444,7 @@ bool ToggleArrows(bool remove) {
     char iconPath[MAX_PATH];
     char regValue[MAX_PATH + 10];
     if (ExtractBlankIcon(iconPath, sizeof(iconPath))) {
-      wsprintfA(regValue, "%s,0", iconPath);
+      wsprintfA(regValue, "%s", iconPath);
 
       HKEY hKey;
       LSTATUS status = RegCreateKeyExA(
